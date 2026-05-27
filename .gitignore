@@ -1,0 +1,26 @@
+# Node / Vite
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Tauri / Rust
+src-tauri/target/
+src-tauri/gen/
+src-tauri/Cargo.lock
+
+# Local runtime and model payloads
+models/*.gguf
+models/*.gguf.*
+runtime/win/*.exe
+runtime/linux/llama-server
+runtime/macos/llama-server
+data/*.json
+!data/settings.example.json
+logs/*.log
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

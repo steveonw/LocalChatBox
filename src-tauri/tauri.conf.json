@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LocalChatBox",
+  "version": "0.3.0",
+  "identifier": "com.localchatbox.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev:ui",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build:ui",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LocalChatBox",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 900,
+        "minHeight": 640,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "msi"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Local GGUF chat cockpit",
+    "longDescription": "Installer-first local chat app that scans hardware, verifies llama.cpp runtimes, manages GGUF models, and provides a local chat interface.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installMode": "currentUser"
+      }
+    }
+  }
+}
