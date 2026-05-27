@@ -782,6 +782,121 @@ ul.compact {
   background: rgba(0, 0, 0, 0.26);
 }
 
+/* ── Setup / requirements screen ─────────────────────────────────────── */
+
+.setup-panel {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 0 24px;
+}
+
+.setup-panel h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #f4efe6;
+  margin: 0 0 6px;
+}
+
+.setup-panel .setup-subtitle {
+  font-size: 0.92rem;
+  color: #8a95a3;
+  margin: 0 0 28px;
+}
+
+.req-row {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 0 14px;
+  align-items: start;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+}
+
+.req-row.req-ok {
+  border-color: rgba(74, 200, 128, 0.3);
+}
+
+.req-row.req-missing {
+  border-color: rgba(255, 160, 60, 0.35);
+}
+
+.req-icon {
+  font-size: 1.1rem;
+  line-height: 1.4;
+}
+
+.req-ok .req-icon { color: #4ac880; }
+.req-missing .req-icon { color: #ffa03c; }
+
+.req-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.req-label {
+  font-size: 0.97rem;
+  font-weight: 600;
+  color: #f4efe6;
+}
+
+.req-detail {
+  font-size: 0.82rem;
+  color: #8a95a3;
+  font-family: "Cascadia Code", "Fira Code", monospace;
+  word-break: break-all;
+}
+
+.req-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.req-hint {
+  font-size: 0.8rem;
+  color: #606878;
+  margin-top: 2px;
+}
+
+.req-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #c8d0dc;
+  font-size: 0.83rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.link-btn:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #f4efe6;
+}
+
+.tab-warn {
+  color: #ffa03c;
+}
+
+/* ── Media queries ─────────────────────────────────────────────────────── */
+
 @media (max-width: 980px) {
   body {
     min-width: 0;

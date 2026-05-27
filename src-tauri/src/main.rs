@@ -3,6 +3,7 @@ mod paths;
 mod runtime;
 mod storage;
 
+use serde::Serialize;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::Manager;
@@ -14,6 +15,62 @@ struct AppState {
 
 fn app_paths() -> Result<paths::AppPaths, String> {
     paths::ensure_workspace()
+}
+
+#[derive(Serialize)]
+pub struct RequirementsReport {
+    pub runtime_found: bool,
+    pub runtime_path: String,
+    pub model_count: usize,
+    pub models_dir: String,
+}
+
+#[tauri::command]
+fn check_requirements(state: tauri::State<'_, AppState>) -> Result<RequirementsReport, String> {
+    let paths = app_paths()?;
+    Ok(RequirementsReport {
+        runtime_found: state.sidecar.exists(),
+        runtime_path: state.sidecar.to_string_lossy().replace('\\', "/"),
+        model_count: models::scan(&paths).unwrap_or_default().len(),
+        models_dir: paths.models_dir,
+    })
+}
+
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err("Only HTTPS URLs are permitted.".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("cmd")
+            .creation_flags(CREATE_NO_WINDOW)
+            .args(["/c", "start", "", &url])
+            .spawn()
+            .map_err(|e| format!("Could not open URL: {e}"))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn reveal_runtime_folder(state: tauri::State<'_, AppState>) -> Result<(), String> {
+    let dir = state
+        .sidecar
+        .parent()
+        .ok_or_else(|| "Cannot resolve runtime folder.".to_string())?;
+    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(dir)
+            .spawn()
+            .map_err(|e| format!("Could not open runtime folder: {e}"))?;
+        return Ok(());
+    }
+    #[allow(unreachable_code)]
+    Err("Not supported on this platform.".to_string())
 }
 
 #[tauri::command]
@@ -132,6 +189,9 @@ fn main() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            check_requirements,
+            open_url,
+            reveal_runtime_folder,
             initialize_workspace,
             reveal_models_folder,
             scan_models,
@@ -148,3 +208,4 @@ fn main() {
         .run(tauri::generate_context!())
         .expect("error while running LocalChatBox");
 }
+

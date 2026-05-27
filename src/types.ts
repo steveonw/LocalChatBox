@@ -1,5 +1,12 @@
 export type RuntimeState = "stopped" | "loading" | "running" | "error";
 
+export interface RequirementsReport {
+  runtime_found: boolean;
+  runtime_path: string;
+  model_count: number;
+  models_dir: string;
+}
+
 export interface AppPaths {
   data_root: string;
   models_dir: string;

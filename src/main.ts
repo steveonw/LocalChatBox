@@ -4,12 +4,13 @@ import type {
   ChatMessage,
   LocalSettings,
   ModelInfo,
+  RequirementsReport,
   RuntimeStartRequest,
   RuntimeStatus,
   StoredChat
 } from "./types";
 
-type TabName = "models" | "chat" | "settings" | "logs";
+type TabName = "setup" | "models" | "chat" | "settings" | "logs";
 type ModeName = "local" | "remote";
 
 const defaultSettings: LocalSettings = {
@@ -34,6 +35,7 @@ const stoppedStatus: RuntimeStatus = {
 };
 
 const state: {
+  requirements: RequirementsReport | null;
   models: ModelInfo[];
   selectedModelPath: string;
   settings: LocalSettings;
@@ -47,13 +49,14 @@ const state: {
   runtimeLog: string;
   drafts: { chatInput: string; systemPrompt: string };
 } = {
+  requirements: null,
   models: [],
   selectedModelPath: "",
   settings: defaultSettings,
   runtime: stoppedStatus,
   chats: [],
   activeChatId: "",
-  activeTab: "models",
+  activeTab: "setup",
   mode: "local",
   busy: false,
   notice: null,
@@ -199,6 +202,84 @@ function modelCardsHtml(): string {
         })
         .join("")}
     </div>
+  `;
+}
+
+function reqRow(ok: boolean, label: string, detail: string, actions: string): string {
+  return `
+    <div class="req-row ${ok ? "req-ok" : "req-missing"}">
+      <div class="req-icon">${ok ? "✅" : "❌"}</div>
+      <div class="req-body">
+        <div class="req-label">${label}</div>
+        <div class="req-detail">${escapeHtml(detail)}</div>
+        ${ok ? "" : `<div class="req-actions">${actions}</div>`}
+      </div>
+    </div>
+  `;
+}
+
+function setupTabHtml(): string {
+  const r = state.requirements;
+  if (!r) {
+    return `<section class="panel"><p>Checking requirements…</p></section>`;
+  }
+
+  const allGood = r.runtime_found && r.model_count > 0;
+
+  const runtimeRow = reqRow(
+    r.runtime_found,
+    "AI runtime",
+    r.runtime_found
+      ? `Found: ${r.runtime_path}`
+      : `Not found. Expected location: ${r.runtime_path}`,
+    `<button data-action="open-runtime-releases">Download from llama.cpp releases ↗</button>
+     <button class="secondary" data-action="open-runtime-folder">Open runtime folder</button>
+     <p class="req-hint">Download a Windows CPU build (e.g. <code>llama-b…-bin-win-cpu-x64.zip</code>),
+     extract <code>llama-server.exe</code>, and place it in the folder above.</p>`
+  );
+
+  const modelsRow = reqRow(
+    r.model_count > 0,
+    "GGUF model",
+    r.model_count > 0
+      ? `${r.model_count} model${r.model_count === 1 ? "" : "s"} found in ${r.models_dir}`
+      : `No models found. Models folder: ${r.models_dir}`,
+    `<button data-action="open-model-hub">Browse GGUF models on HuggingFace ↗</button>
+     <button class="secondary" data-action="reveal-models">Open models folder</button>
+     <p class="req-hint">Download any <code>.gguf</code> file and place it in the folder above.
+     Smaller models (under 4 GB) work best for CPU-only inference.</p>`
+  );
+
+  return `
+    <section class="panel setup-panel">
+      <div class="panel-title">
+        <div>
+          <h2>${allGood ? "Ready to chat" : "Setup required"}</h2>
+          <p>${allGood
+            ? "Both requirements are met. Head to the Models tab to start a model."
+            : "LocalChatBox needs a runtime and at least one model before it can chat locally."}</p>
+        </div>
+        <button data-action="check-requirements" ${state.busy ? "disabled" : ""}>
+          Check again
+        </button>
+      </div>
+
+      <div class="req-list">
+        ${runtimeRow}
+        ${modelsRow}
+      </div>
+
+      ${allGood ? `
+        <div class="button-row">
+          <button data-tab="models">Go to Models →</button>
+        </div>
+      ` : `
+        <p class="req-footer">
+          After placing the files, click <strong>Check again</strong>.
+          <button class="link-btn" data-tab="models">Continue anyway</button>
+        </p>
+      `}
+    </section>
   `;
 }
 
@@ -382,16 +463,20 @@ function render(): void {
       ${noticeHtml()}
 
       <nav class="tabs">
-        ${(["models", "chat", "settings", "logs"] as TabName[])
-          .map(
-            (tab) =>
-              `<button class="${state.activeTab === tab ? "active" : ""}"
-                data-tab="${tab}">${tab}</button>`
-          )
+        ${(["setup", "models", "chat", "settings", "logs"] as TabName[])
+          .map((tab) => {
+            const needsAttention =
+              tab === "setup" &&
+              state.requirements !== null &&
+              (!state.requirements.runtime_found || state.requirements.model_count === 0);
+            return `<button class="${state.activeTab === tab ? "active" : ""}${needsAttention ? " tab-warn" : ""}"
+              data-tab="${tab}">${tab}${needsAttention ? " ⚠" : ""}</button>`;
+          })
           .join("")}
       </nav>
 
       <div class="tab-content">
+        ${state.activeTab === "setup" ? setupTabHtml() : ""}
         ${state.activeTab === "models" ? modelsTabHtml() : ""}
         ${state.activeTab === "chat" ? chatTabHtml() : ""}
         ${state.activeTab === "settings" ? settingsTabHtml() : ""}
@@ -501,6 +586,18 @@ function bindEvents(): void {
 
 async function handleAction(action: string): Promise<void> {
   switch (action) {
+    case "check-requirements":
+      await checkRequirements();
+      break;
+    case "open-runtime-releases":
+      await api.openUrl("https://github.com/ggerganov/llama.cpp/releases");
+      break;
+    case "open-runtime-folder":
+      await api.revealRuntimeFolder();
+      break;
+    case "open-model-hub":
+      await api.openUrl("https://huggingface.co/models?library=gguf&sort=downloads");
+      break;
     case "scan-models":
       await scanModels();
       break;
@@ -537,6 +634,20 @@ async function handleAction(action: string): Promise<void> {
       break;
     default:
       break;
+  }
+}
+
+async function checkRequirements(): Promise<void> {
+  state.busy = true;
+  render();
+  try {
+    state.requirements = await api.checkRequirements();
+  } catch (err) {
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
   }
 }
 
@@ -691,13 +802,20 @@ async function init(): Promise<void> {
     state.chats = await api.loadChats();
     if (state.chats[0]) state.activeChatId = state.chats[0].id;
 
+    state.requirements = await api.checkRequirements();
+    const ready = state.requirements.runtime_found && state.requirements.model_count > 0;
+
     state.models = await api.scanModels();
     if (state.models[0]) state.selectedModelPath = state.models[0].path;
 
     state.runtime = await api.runtimeStatus();
 
-    if (state.runtime.state === "running" || state.chats.length > 0) {
+    if (!ready) {
+      state.activeTab = "setup";
+    } else if (state.runtime.state === "running" || state.chats.length > 0) {
       state.activeTab = "chat";
+    } else {
+      state.activeTab = "models";
     }
 
     render();

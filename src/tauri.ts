@@ -5,12 +5,16 @@ import type {
   ChatResponse,
   LocalSettings,
   ModelInfo,
+  RequirementsReport,
   RuntimeStartRequest,
   RuntimeStatus,
   StoredChat
 } from "./types";
 
 export const api = {
+  checkRequirements: () => invoke<RequirementsReport>("check_requirements"),
+  openUrl: (url: string) => invoke<void>("open_url", { url }),
+  revealRuntimeFolder: () => invoke<void>("reveal_runtime_folder"),
   initializeWorkspace: () => invoke<AppPaths>("initialize_workspace"),
   scanModels: () => invoke<ModelInfo[]>("scan_models"),
   loadSettings: () => invoke<LocalSettings>("load_settings"),
