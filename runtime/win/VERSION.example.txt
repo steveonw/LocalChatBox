@@ -1,0 +1,38 @@
+# LocalChatBox runtime binary record
+
+Use this file as a template. For an actual runtime bundle, copy it to `VERSION.txt`
+and fill in the exact llama.cpp release or commit used for every binary.
+
+llama.cpp source:
+  Repository: https://github.com/ggml-org/llama.cpp
+  Release tag or commit:
+  Build date:
+  Builder:
+  Notes:
+
+Binaries:
+  llama-server-cuda.exe:
+    source release/commit:
+    build options:
+    CUDA version:
+    target CPU baseline:
+
+  llama-server-cpu-avx2.exe:
+    source release/commit:
+    build options:
+    target CPU baseline:
+
+  llama-server-cpu-avx.exe:
+    source release/commit:
+    build options:
+    target CPU baseline:
+
+  llama-server-cpu-basic.exe:
+    source release/commit:
+    build options:
+    target CPU baseline:
+
+  llama-server.exe:
+    source release/commit:
+    build options:
+    target CPU baseline:
