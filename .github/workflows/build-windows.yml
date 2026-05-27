@@ -38,7 +38,7 @@ jobs:
           npx vite --version
 
       - name: Build frontend
-        run: npm run build
+        run: npx tsc && npx vite build
 
       - name: Check Rust/Tauri backend
         run: cargo check
