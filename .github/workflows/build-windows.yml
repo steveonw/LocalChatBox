@@ -2,6 +2,15 @@ name: Build Windows Installer
 
 on:
   workflow_dispatch:
+    inputs:
+      allow_runtimeless_release:
+        description: "Allow a tag release without a bundled llama-server runtime"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
   push:
     branches:
       - main
@@ -10,6 +19,13 @@ on:
   pull_request:
     branches:
       - main
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
   build-windows:
@@ -29,23 +45,74 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build outputs
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Verify frontend tools
+      - name: Verify toolchain
+        shell: pwsh
         run: |
+          node --version
+          npm --version
+          rustc --version
+          cargo --version
           npx tsc --version
           npx vite --version
+
+      - name: Optional runtime-pack download
+        shell: pwsh
+        env:
+          LOCALCHATBOX_RUNTIME_PACK_URL: ${{ vars.LOCALCHATBOX_RUNTIME_PACK_URL }}
+        run: |
+          .\scripts\prepare-runtime-pack.ps1 -Ci
+
+      - name: Enforce runtime for tagged releases
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          ALLOW_RUNTIMELESS_RELEASE: ${{ github.event.inputs.allow_runtimeless_release }}
+        run: |
+          $runtimeFiles = Get-ChildItem ".\runtime\win" -Filter "llama-server*.exe" -ErrorAction SilentlyContinue
+          if (($runtimeFiles.Count -eq 0) -and ($env:ALLOW_RUNTIMELESS_RELEASE -ne "true")) {
+            throw "Tagged releases must include at least one runtime/win/llama-server*.exe. Set repository variable LOCALCHATBOX_RUNTIME_PACK_URL or run workflow_dispatch with allow_runtimeless_release=true for source-preview builds."
+          }
+          if ($runtimeFiles.Count -gt 0) {
+            Write-Host "Bundled runtime files:"
+            $runtimeFiles | ForEach-Object { Write-Host " - $($_.Name)" }
+          }
 
       - name: Build frontend
         run: npx tsc && npx vite build
 
-      - name: Check Rust/Tauri backend
-        run: cargo check
+      - name: Generate Cargo.lock if missing
+        shell: pwsh
         working-directory: src-tauri
+        run: |
+          if (-not (Test-Path ".\Cargo.lock")) {
+            cargo generate-lockfile
+          }
+
+      - name: Check Rust/Tauri backend
+        shell: pwsh
+        working-directory: src-tauri
+        run: |
+          if (Test-Path ".\Cargo.lock") {
+            cargo check --locked
+          } else {
+            cargo check
+          }
 
       - name: Build Tauri Windows installer
         run: npm run tauri:build
+
+      - name: Stage release artifacts
+        shell: pwsh
+        run: |
+          .\scripts\stage-release-artifacts.ps1 -Version "${{ github.ref_name }}"
 
       - name: Upload Windows installer artifacts
         uses: actions/upload-artifact@v4
@@ -53,6 +120,26 @@ jobs:
           name: LocalChatBox-Windows
           if-no-files-found: error
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/*.exe
+            dist-release/*.exe
+            dist-release/*.msi
+            dist-release/*.zip
+            dist-release/*.sha256
+
+      - name: Publish GitHub Release for tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          $notes = "RELEASE_NOTES_0_3.md"
+          if (-not (Test-Path $notes)) {
+            $notes = "README.md"
+          }
+
+          gh release view $env:TAG_NAME *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:TAG_NAME --title "LocalChatBox $env:TAG_NAME" --notes-file $notes
+          }
+
+          gh release upload $env:TAG_NAME .\dist-release\* --clobber

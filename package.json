@@ -1,7 +1,7 @@
 {
   "name": "localchatbox",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
@@ -10,7 +10,8 @@
     "build:ui": "tsc && vite build",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-windows-installer.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0"
