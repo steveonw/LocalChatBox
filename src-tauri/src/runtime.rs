@@ -914,12 +914,28 @@ pub async fn switch_model(
             locked.status.message = format!("Loading {target_model_id} through router…");
             locked.status.model_path = Some(request.model_path.clone());
             locked.status.model_name = Some(model_name_from_path(&request.model_path));
-            locked.status.loaded_model_id = Some(target_model_id.clone());
+            // loaded_model_id stays as the previous value until load succeeds
             locked.status.model_status = Some("loading".to_string());
             persist_runtime_state(paths, &locked.status);
         }
 
-        post_router_action(&current_status, "/models/load", &target_model_id).await?;
+        if let Err(err) = post_router_action(&current_status, "/models/load", &target_model_id).await {
+            let mut locked = manager
+                .lock()
+                .map_err(|_| "Runtime manager lock was poisoned.".to_string())?;
+            locked.status.model_status = Some("failed".to_string());
+            locked.status.state = "error".to_string();
+            locked.status.message = format!("Router failed to load {target_model_id}: {err}");
+            persist_runtime_state(paths, &locked.status);
+            return Err(err);
+        }
+
+        {
+            let mut locked = manager
+                .lock()
+                .map_err(|_| "Runtime manager lock was poisoned.".to_string())?;
+            locked.status.loaded_model_id = Some(target_model_id.clone());
+        }
 
         let result = wait_for_ready_or_exit(
             manager,

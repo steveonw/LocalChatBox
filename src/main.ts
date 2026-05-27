@@ -792,52 +792,79 @@ async function handleAction(action: string): Promise<void> {
 async function scanHardware(): Promise<void> {
   state.busy = true;
   render();
-  state.hardware = await api.scanHardware();
-  setNotice("ok", "Hardware scan complete.");
-  state.busy = false;
-  render();
-  clearNoticeSoon();
+  try {
+    state.hardware = await api.scanHardware();
+    setNotice("ok", "Hardware scan complete.");
+    clearNoticeSoon();
+  } catch (err) {
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
+  }
 }
 
 async function probeRuntime(): Promise<void> {
   state.busy = true;
   render();
-  state.engine = await api.probeRuntimeManifest();
-  setNotice(state.engine.runtimes.some((runtime) => runtime.status === "verified") ? "ok" : "warn", "Runtime probe complete.");
-  state.busy = false;
-  render();
-  clearNoticeSoon();
+  try {
+    const engine: EngineManifest = await api.probeRuntimeManifest();
+    state.engine = engine;
+    setNotice(engine.runtimes.some((runtime) => runtime.status === "verified") ? "ok" : "warn", "Runtime probe complete.");
+    clearNoticeSoon();
+  } catch (err) {
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
+  }
 }
 
 async function scanModels(): Promise<void> {
   state.busy = true;
   render();
-  state.modelRegistry = await api.scanModelRegistry();
-  state.models = state.modelRegistry.models;
-  if (!state.selectedModelPath && state.models[0]) {
-    state.selectedModelPath = state.models[0].path;
+  try {
+    const registry: ModelRegistry = await api.scanModelRegistry();
+    state.modelRegistry = registry;
+    state.models = registry.models;
+    if (!state.selectedModelPath && state.models[0]) {
+      state.selectedModelPath = state.models[0].path;
+    }
+    setNotice(state.models.length ? "ok" : "warn", state.models.length ? `Found ${state.models.length} GGUF model(s).` : "No GGUF models found.");
+    clearNoticeSoon();
+  } catch (err) {
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
   }
-  setNotice(state.models.length ? "ok" : "warn", state.models.length ? `Found ${state.models.length} GGUF model(s).` : "No GGUF models found.");
-  state.busy = false;
-  render();
-  clearNoticeSoon();
 }
 
 async function runDoctor(): Promise<void> {
   state.busy = true;
   render();
-  state.doctor = await api.runDoctor();
-  state.hardware = state.doctor.hardware;
-  state.engine = state.doctor.engine;
-  state.modelRegistry = state.doctor.model_registry;
-  state.models = state.modelRegistry.models;
-  if (!state.selectedModelPath && state.models[0]) {
-    state.selectedModelPath = state.models[0].path;
+  try {
+    const doctor: DoctorReport = await api.runDoctor();
+    state.doctor = doctor;
+    state.hardware = doctor.hardware;
+    state.engine = doctor.engine;
+    state.modelRegistry = doctor.model_registry;
+    state.models = doctor.model_registry.models;
+    if (!state.selectedModelPath && state.models[0]) {
+      state.selectedModelPath = state.models[0].path;
+    }
+    setNotice(doctor.result === "ready" ? "ok" : "warn", doctor.next_step);
+    clearNoticeSoon();
+  } catch (err) {
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
   }
-  setNotice(state.doctor.result === "ready" ? "ok" : "warn", state.doctor.next_step);
-  state.busy = false;
-  render();
-  clearNoticeSoon();
 }
 
 async function startRuntime(switchOnly: boolean): Promise<void> {
@@ -850,23 +877,34 @@ async function startRuntime(switchOnly: boolean): Promise<void> {
 
   state.busy = true;
   render();
-
-  state.runtime = switchOnly ? await api.switchLocalModel(request) : await api.startRuntime(request);
-  setNotice(state.runtime.state === "running" ? "ok" : "warn", state.runtime.message);
-  state.busy = false;
-  state.activeTab = "chat";
-  render();
-  clearNoticeSoon();
+  try {
+    state.runtime = switchOnly ? await api.switchLocalModel(request) : await api.startRuntime(request);
+    setNotice(state.runtime.state === "running" ? "ok" : "warn", state.runtime.message);
+    state.activeTab = "chat";
+    clearNoticeSoon();
+  } catch (err) {
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
+  }
 }
 
 async function stopRuntime(): Promise<void> {
   state.busy = true;
   render();
-  state.runtime = await api.stopRuntime();
-  setNotice("ok", "Runtime stopped.");
-  state.busy = false;
-  render();
-  clearNoticeSoon();
+  try {
+    state.runtime = await api.stopRuntime();
+    setNotice("ok", "Runtime stopped.");
+    clearNoticeSoon();
+  } catch (err) {
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
+  }
 }
 
 async function sendMessage(): Promise<void> {
@@ -874,7 +912,8 @@ async function sendMessage(): Promise<void> {
   if (!text) return;
 
   const chat = ensureChat();
-  if (chat.messages.length === 0 && state.drafts.systemPrompt.trim()) {
+  const systemAdded = chat.messages.length === 0 && state.drafts.systemPrompt.trim() !== "";
+  if (systemAdded) {
     chat.messages.push({ role: "system", content: state.drafts.systemPrompt.trim() });
   }
 
@@ -888,23 +927,33 @@ async function sendMessage(): Promise<void> {
   state.busy = true;
   render();
 
-  const response = await api.sendChat({
-    mode: state.mode,
-    messages: chat.messages,
-    temperature: state.settings.temperature,
-    max_tokens: state.settings.max_tokens,
-    model: state.mode === "local" ? selectedModelId() : state.settings.remote_model_name,
-    remote_base_url: state.settings.remote_base_url,
-    remote_api_key: state.settings.remote_api_key
-  });
+  try {
+    const response = await api.sendChat({
+      mode: state.mode,
+      messages: chat.messages,
+      temperature: state.settings.temperature,
+      max_tokens: state.settings.max_tokens,
+      model: state.mode === "local" ? selectedModelId() : state.settings.remote_model_name,
+      remote_base_url: state.settings.remote_base_url,
+      remote_api_key: state.settings.remote_api_key
+    });
 
-  chat.messages.push({ role: "assistant", content: response.content });
-  chat.model = response.model ?? (state.mode === "local" ? selectedModelId() : state.settings.remote_model_name);
-  chat.updated_at = nowIso();
-  await api.saveChats(state.chats);
-
-  state.busy = false;
-  render();
+    chat.messages.push({ role: "assistant", content: response.content });
+    chat.model = response.model ?? (state.mode === "local" ? selectedModelId() : state.settings.remote_model_name);
+    chat.updated_at = nowIso();
+    await api.saveChats(state.chats);
+  } catch (err) {
+    // Restore user's draft so they can retry without retyping
+    state.drafts.chatInput = text;
+    // Remove the user message (and system message if we just added it) from the chat
+    chat.messages.pop();
+    if (systemAdded) chat.messages.pop();
+    setNotice("error", err instanceof Error ? err.message : String(err));
+    clearNoticeSoon();
+  } finally {
+    state.busy = false;
+    render();
+  }
 }
 
 async function pollRuntime(): Promise<void> {
@@ -944,8 +993,9 @@ async function init(): Promise<void> {
     }
 
     try {
-      state.modelRegistry = await api.scanModelRegistry();
-      state.models = state.modelRegistry.models;
+      const registry: ModelRegistry = await api.scanModelRegistry();
+      state.modelRegistry = registry;
+      state.models = registry.models;
       if (state.models[0]) state.selectedModelPath = state.models[0].path;
     } catch {
       state.models = await api.scanModels();

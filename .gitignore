@@ -7,7 +7,6 @@ dist-ssr/
 # Tauri / Rust
 src-tauri/target/
 src-tauri/gen/
-src-tauri/Cargo.lock
 
 # Local runtime and model payloads
 models/*.gguf

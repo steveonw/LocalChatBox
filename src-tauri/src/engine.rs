@@ -79,6 +79,15 @@ fn run_probe_command(path: &Path, arg: &str) -> Result<String, String> {
         text.push_str(&stderr);
     }
 
+    if !output.status.success() {
+        return Err(format!(
+            "{} {arg} exited with status {:?}: {}",
+            path.display(),
+            output.status.code(),
+            text.trim()
+        ));
+    }
+
     Ok(text)
 }
 
