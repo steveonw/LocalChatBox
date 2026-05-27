@@ -28,7 +28,12 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install --include=dev
+
+      - name: Verify frontend tools
+        run: |
+          npx tsc --version
+          npx vite --version
 
       - name: Build frontend
         run: npm run build
