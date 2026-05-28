@@ -60,8 +60,8 @@ jobs:
           npm --version
           rustc --version
           cargo --version
-          npx tsc --version
-          npx vite --version
+          node node_modules/typescript/bin/tsc --version
+          node node_modules/vite/bin/vite.js --version
 
       - name: Optional runtime-pack download
         shell: pwsh
@@ -86,7 +86,10 @@ jobs:
           }
 
       - name: Build frontend
-        run: npx tsc && npx vite build
+        shell: pwsh
+        run: |
+          node node_modules/typescript/bin/tsc
+          node node_modules/vite/bin/vite.js build
 
       - name: Generate Cargo.lock if missing
         shell: pwsh
