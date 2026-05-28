@@ -167,9 +167,8 @@ async fn send_chat(
 fn stop_on_close(app_handle: &tauri::AppHandle) {
     let Ok(paths) = app_paths() else { return };
     let state = app_handle.state::<AppState>();
-    if let Ok(mut rt) = state.runtime.lock() {
-        let _ = rt.stop(&paths);
-    }
+    let Ok(mut rt) = state.runtime.lock() else { return };
+    let _ = rt.stop(&paths);
 }
 
 fn main() {
