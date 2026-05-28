@@ -40,7 +40,7 @@
       "icons/icon.ico"
     ],
     "category": "Productivity",
-    "resources": ["../runtime/win/llama-server*.exe"],
+    "resources": ["../runtime/win/llama-server*.exe", "../runtime/win/*.dll"],
     "shortDescription": "Private local AI chat",
     "longDescription": "Bundles a pinned llama.cpp CPU runtime, stores GGUF models in %LOCALAPPDATA%\\LocalChatBox\\models, and provides a ChatGPT-like local chat interface.",
     "windows": {
